@@ -1,0 +1,4 @@
+{
+  "rewrites": [{ "source": "/host", "destination": "/index.html" }]
+}
+

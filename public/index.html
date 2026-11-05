@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Debate: Bitcoin</title>
+  <style>
+    :root {
+      --bg: #1b1c1d;
+      --card: #38393a;
+      --gold: #e8d77a;
+      --orange: #f7931a;
+      --green: #2e6b34;
+      --red: #8a1f1c;
+      --g2: #5fd068;
+      --r2: #ff6b64
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: #fff;
+      font-family: system-ui, Segoe UI, Roboto, sans-serif;
+      min-height: 100vh
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px
+    }
+
+    .host .wrap {
+      max-width: 1100px
+    }
+
+    h1,
+    h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--gold);
+      font-weight: 400;
+      margin: .2em 0 .5em
+    }
+
+    h1 {
+      font-size: 2rem
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      line-height: 1.3
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 12px 0
+    }
+
+    .muted {
+      color: #c9c9c9;
+      font-size: .95rem
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      font-size: 1.1rem;
+      border-radius: 8px;
+      border: 0;
+      margin: 8px 0
+    }
+
+    button {
+      font-size: 1.1rem;
+      border: 0;
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      color: #fff;
+      font-weight: 600
+    }
+
+    button:disabled {
+      opacity: .5
+    }
+
+    .btn {
+      background: var(--orange);
+      width: 100%
+    }
+
+    .row {
+      display: flex;
+      gap: 12px
+    }
+
+    .row>* {
+      flex: 1
+    }
+
+    .favor {
+      background: var(--green)
+    }
+
+    .contra {
+      background: var(--red)
+    }
+
+    .vote {
+      padding: 22px 10px;
+      font-size: 1.3rem;
+      border: 3px solid transparent
+    }
+
+    .vote.sel {
+      border-color: #fff
+    }
+
+    .arg {
+      border-radius: 10px;
+      padding: 12px;
+      margin: 8px 0;
+      font-size: .95rem;
+      line-height: 1.4
+    }
+
+    .tag {
+      font-size: .8rem;
+      letter-spacing: .08em;
+      color: #ddd;
+      display: block;
+      margin-bottom: 4px
+    }
+
+    .bars {
+      margin: 10px 0
+    }
+
+    .bar {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      gap: 10px
+    }
+
+    .bar .l {
+      width: 80px
+    }
+
+    .bar .t {
+      flex: 1;
+      background: #2a2b2c;
+      border-radius: 6px;
+      height: 34px;
+      overflow: hidden
+    }
+
+    .bar .f {
+      height: 100%;
+      transition: width .6s;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-weight: 700
+    }
+
+    .btc {
+      color: var(--orange);
+      font-weight: 700
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .9rem;
+      color: #c9c9c9
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #4a4b4c
+    }
+
+    td:last-child {
+      text-align: right
+    }
+
+    .big {
+      font-size: 1.6rem
+    }
+
+    .host h2 {
+      font-size: 1.9rem
+    }
+
+    .host .arg {
+      font-size: 1.1rem
+    }
+
+    .ctrl {
+      position: sticky;
+      bottom: 0;
+      background: #111;
+      padding: 12px;
+      display: flex;
+      gap: 10px;
+      margin: 0 -20px
+    }
+
+    .ctrl button {
+      flex: 1
+    }
+
+    .gray {
+      background: #555
+    }
+
+    .pill {
+      display: inline-block;
+      background: #111;
+      border-radius: 99px;
+      padding: 4px 12px;
+      font-size: .85rem;
+      margin-right: 6px
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="app"></div>
+  <script>
+    const IS_HOST = location.pathname === '/host';
+    if (IS_HOST) document.body.classList.add('host');
+    const $ = (h) => { document.getElementById('app').innerHTML = h; };
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const fmt = (n) => (Math.round(n * 1000) / 1000).toFixed(3).replace('.', ',') + ' BTC';
+    let token = localStorage.getItem('token');
+    let hostKey = sessionStorage.getItem('hostKey');
+    let S = null, err = '', lastVote = null;
+const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
+
+    async function api(path, body) {
+      const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-host-key': hostKey || '' }, body: JSON.stringify(body) } : { headers: { 'x-host-key': hostKey || '' } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Erro');
+      return j;
+    }
+
+    const bars = (c, title) => {
+      const t = (c.favor + c.contra) || 1;
+      const row = (l, n, cls) => `<div class="bar"><div class="l">${l}</div><div class="t"><div class="f ${cls}" style="width:${Math.max(n / t * 100, n ? 8 : 0)}%">${n}</div></div><div>${Math.round(n / t * 100)}%</div></div>`;
+      return `<div class="bars"><div class="muted">${title}</div>${row('A favor', c.favor, 'favor')}${row('Contra', c.contra, 'contra')}</div>`;
+    };
+    const rankTable = (r, n) => `<table>${r.slice(0, n || r.length).map((p, i) => `<tr><td>${i + 1}º</td><td>${esc(p.nick)}</td><td class="btc">${fmt(p.btc)}<div class="muted" style="font-weight:400">${brl(p.brl)}</div></td></tr>`).join('')}</table>`;
+
+    const stepName = { v1: 'Voto 1', r1: 'Resultado do voto 1', v2: 'Voto 2 (depois do debate)', r2: 'Resultado final da pergunta' };
+
+    function questionBlock(s) {
+      return `<h2>Pergunta ${s.q + 1} de ${s.total}</h2><div class="card big" style="font-size:1.2rem;line-height:1.4">${esc(s.question.title)}</div>`;
+    }
+    function argsBlock(s) {
+      return `<div class="arg favor"><span class="tag">A FAVOR</span>${esc(s.question.favor)}</div><div class="arg contra"><span class="tag">CONTRA</span>${esc(s.question.contra)}</div>`;
+    }
+
+    // -------- Jogador --------
+    function renderPlayer() {
+      const s = S;
+      if (!token || !s.me) return renderJoin();
+      let h = `<div class="top"><span>👤 ${esc(s.me.nick)}</span><span class="btc">${fmt(s.me.btc)} · ${brl(s.me.brl)}</span></div>`;
+      if (s.kind === 'lobby') {
+        if (s.me.late) h += '<div class="card" style="background:#5a4a12">Você entrou com o jogo em andamento: as perguntas já encerradas não contam. Nas próximas, você concorre normalmente!</div>';
+    h += `<h1>Você está dentro!</h1><div class="card">Aguarde o início do debate. ${s.players} pessoas na sala.<br><br><span class="muted">Cada pergunta vale ${fmt(s.prize)}. Quem fica na maioria do 2º voto ganha: manteve o voto = 100%, mudou de opinião = 50%. Quem fica na minoria ganha zero.<br><br>No final, convertemos seu saldo para reais pela cotação do bitcoin (${brl(s.price.brl)} por BTC).</span></div>`;
+      } else if (s.kind === 'final') {
+        const pos = s.ranking.findIndex((p) => p.nick === s.me.nick) + 1;
+        h += `<h1>Fim do debate!</h1><div class="card big">Você ficou em <b>${pos}º</b> com <span class="btc">${fmt(s.me.btc)}</span><div class="muted" style="font-size:1rem">Na vida real, isso seria <b>${brl(s.me.brl)}</b> (BTC a ${brl(s.price.brl)})</div></div><h2>Ranking</h2><div class="card">${rankTable(s.ranking, 10)}</div>`;
+      } else {
+        h += questionBlock(s);
+        const step = s.step;
+        if (step === 'v1' || step === 'v2') {
+          const server = step === 'v1' ? s.myV1 : s.myV2;
+      const mine = lastVote && lastVote.key === s.phase && Date.now() - lastVote.t < 4000 ? lastVote.choice : server;
+          h += `<div class="muted">${stepName[step]}: escolha o seu lado</div>`;
+          h += `<div class="row" style="margin:10px 0"><button class="vote favor ${mine === 'favor' ? 'sel' : ''}" onclick="vote('favor')">A FAVOR</button><button class="vote contra ${mine === 'contra' ? 'sel' : ''}" onclick="vote('contra')">CONTRA</button></div>`;
+          h += mine ? `<div class="card">✅ Voto registrado. Você pode trocar até o fechamento.</div>` : `<div class="card muted">Ainda sem voto.</div>`;
+          h += argsBlock(s);
+        } else if (step === 'r1') {
+          h += bars(s.results, 'Resultado do voto 1') + `<div class="card">Seu voto: <b>${s.myV1 === 'favor' ? 'A FAVOR' : s.myV1 === 'contra' ? 'CONTRA' : 'não votou'}</b>. Hora do debate: fale e ouça!</div>` + argsBlock(s);
+        } else {
+          h += bars(s.resultsV1, 'Voto 1') + bars(s.resultsV2, 'Voto 2');
+          const msg = s.myReward > 0 ? (s.changed ? 'Você mudou de opinião e ficou na maioria: 50%.' : 'Você manteve o voto e ficou na maioria: 100%!') : 'Desta vez você não ganhou.';
+          h += `<div class="card big">${s.myReward > 0 ? '🎉 +' + fmt(s.myReward) + ' (' + brl(s.myRewardBrl) + ')' : '😶 0 BTC'}<div class="muted" style="font-size:.95rem">${msg}</div></div><h2>Top 5</h2><div class="card">${rankTable(s.ranking)}</div>`;
+        }
+      }
+      if (err) h += `<div class="card" style="background:var(--red)">${esc(err)}</div>`;
+      $(h);
+    }
+    function renderJoin() {
+      const el = document.getElementById('nick');
+      if (el && document.activeElement === el) return;
+      $(`<h1>₿ Debate Bitcoin</h1><div class="card"><p>Escolha um apelido para entrar. Sem cadastro. Os bitcoins são fictícios!</p><input id="nick" maxlength="20" placeholder="Seu apelido" autocomplete="off"><button class="btn" onclick="join()">Entrar</button>${err ? `<p style="color:var(--r2)">${esc(err)}</p>` : ''}</div>`);
+    }
+    async function join() {
+      try {
+        const nick = document.getElementById('nick').value;
+        const r = await api('/api/join', { nick, token });
+        token = r.token; localStorage.setItem('token', token); err = ''; poll();
+      } catch (e) { err = e.message; renderJoin(); }
+    }
+    async function vote(choice) {
+      try { await api('/api/vote', { token, choice }); err = ''; lastVote = { key: S.phase, choice, t: Date.now() }; } catch (e) { err = e.message; }
+      poll();
+    }
+
+    // -------- Apresentador --------
+    function renderHost() {
+      const s = S;
+  if (document.activeElement && document.activeElement.id === 'price') return;
+      if (!hostKey) {
+        const el = document.getElementById('key');
+        if (el && document.activeElement === el) return;
+        return $(`<h1>Painel do apresentador</h1><div class="card"><input id="key" type="password" placeholder="Chave"><button class="btn" onclick="setKey()">Entrar</button></div>`);
+      }
+      let h = `<div class="top"><span><span class="pill">👥 ${s.players} na sala</span><span class="pill">Fase ${s.phase}/${s.last}</span></span><span>${esc(location.origin)}</span></div>`;
+      let nextLabel = 'Avançar ▶';
+      if (s.kind === 'lobby') {
+        h += `<h1>Debate: Bitcoin</h1><div class="card big">Entre em <b>${esc(location.origin)}</b><br><span class="muted">Basta digitar um apelido.</span></div>`;
+        h += `<div class="card"><img alt="" id="qr" width="180" height="180" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(location.origin)}" onerror="this.remove()"></div>`;
+        h += `<div class="card">${s.ranking.map((p) => esc(p.nick)).join(' · ') || '<span class="muted">Ninguém entrou ainda</span>'}</div>`;
+        nextLabel = 'Começar ▶';
+      } else if (s.kind === 'final') {
+        h += `<h1>Ranking final</h1><div class="card big">${rankTable(s.ranking, 10)}</div>`;
+        nextLabel = 'Fim';
+      } else {
+        h += `<span class="pill">${stepName[s.step]}</span>` + questionBlock(s);
+        if (s.step === 'v1' || s.step === 'v2') {
+          h += `<div class="card big">🗳️ ${s.voted} de ${s.players} já votaram</div>` + argsBlock(s);
+          nextLabel = 'Fechar votação e mostrar resultado ▶';
+        } else if (s.step === 'r1') {
+          h += bars(s.results, 'Voto 1') + argsBlock(s);
+          nextLabel = 'Abrir voto 2 ▶';
+        } else {
+          h += bars(s.resultsV1, 'Voto 1') + bars(s.resultsV2, 'Voto 2') + `<div class="card">🔄 ${s.changedCount} pessoa(s) mudaram de opinião.</div><h2>Top 5</h2><div class="card">${rankTable(s.ranking, 5)}</div>`;
+          nextLabel = s.q === s.total - 1 ? 'Ver ranking final ▶' : 'Próxima pergunta ▶';
+        }
+      }
+      h += `<div class="card muted">Cotação usada: <b>${brl(s.price.brl)}</b> por BTC (${s.price.source}). Definir manualmente: <input id="price" style="width:160px;display:inline" placeholder="ex.: 450000"> <button class="gray" style="padding:8px 14px" onclick="setPrice()">Aplicar</button> (vazio = automático)</div><div class="ctrl"><button class="gray" onclick="act('back')" ${s.phase === 0 ? 'disabled' : ''}>◀ Voltar</button><button class="btn" onclick="act('next')" ${s.phase >= s.last ? 'disabled' : ''}>${nextLabel}</button><button class="gray" style="flex:.4" onclick="if(confirm('Apagar tudo e reiniciar?'))act('reset')">Reiniciar</button></div>`;
+      $(h);
+    }
+    function setKey() { hostKey = document.getElementById('key').value; sessionStorage.setItem('hostKey', hostKey); poll(); }
+    async function setPrice() { try { await api('/api/host', { action: 'price', value: document.getElementById('price').value }); } catch (e) { alert(e.message); } poll(); }
+async function act(action) { try { await api('/api/host', { action }); } catch (e) { alert(e.message); if (/chave/i.test(e.message)) { hostKey = null; sessionStorage.removeItem('hostKey'); } } poll(); }
+
+    async function poll() {
+      try {
+        S = await api('/api/state?token=' + encodeURIComponent(token || ''));
+        if (IS_HOST) {
+          if (hostKey && S.ranking === undefined) { hostKey = null; sessionStorage.removeItem('hostKey'); }
+          renderHost();
+        } else renderPlayer();
+      } catch (e) { /* mantém tela */ }
+    }
+    poll(); setInterval(poll, 2500);
+  </script>
+</body>
+
+</html>
