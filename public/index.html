@@ -236,6 +236,21 @@
       font-size: .85rem;
       margin-right: 6px
     }
+
+    .speaker-box {
+      background: linear-gradient(135deg, #2b2510, #382c0b);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 14px 0;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(232, 215, 122, 0.15);
+      animation: pop 0.25s ease-out;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.97); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
   </style>
 </head>
 
@@ -297,7 +312,22 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
           h += mine ? `<div class="card">✅ Voto registrado. Você pode trocar até o fechamento.</div>` : `<div class="card muted">Ainda sem voto.</div>`;
           h += argsBlock(s);
         } else if (step === 'r1') {
-          h += bars(s.results, 'Resultado do voto 1') + `<div class="card">Seu voto: <b>${s.myV1 === 'favor' ? 'A FAVOR' : s.myV1 === 'contra' ? 'CONTRA' : 'não votou'}</b>. Hora do debate: fale e ouça!</div>` + argsBlock(s);
+          h += bars(s.results, 'Resultado do voto 1');
+          if (s.speaker) {
+            const isMe = s.me && s.speaker.nick.toLowerCase() === s.me.nick.toLowerCase();
+            if (isMe) {
+              h += `<div class="speaker-box" style="border-color:#5fd068;background:#18361b;margin:12px 0">
+                <div style="font-size:1.15rem;font-weight:700;color:#5fd068">🎤 VOCÊ FOI SORTEADO(A) PARA FALAR!</div>
+                <div style="font-size:0.95rem;margin-top:4px">Compartilhe e defenda seus argumentos com a sala agora!</div>
+              </div>`;
+            } else {
+              const vTxt = s.speaker.vote === 'favor' ? ' (Votou A Favor)' : s.speaker.vote === 'contra' ? ' (Votou Contra)' : '';
+              h += `<div class="card" style="background:#28261a;border-left:4px solid var(--gold);padding:12px 14px;font-size:1rem">
+                🎤 <b>${esc(s.speaker.nick)}</b> foi sorteado(a) para falar${esc(vTxt)}. Ouça a argumentação!
+              </div>`;
+            }
+          }
+          h += `<div class="card">Seu voto: <b>${s.myV1 === 'favor' ? 'A FAVOR' : s.myV1 === 'contra' ? 'CONTRA' : 'não votou'}</b>. Hora do debate: fale e ouça!</div>` + argsBlock(s);
         } else {
           h += bars(s.resultsV1, 'Voto 1') + bars(s.resultsV2, 'Voto 2');
           const msg = s.myReward > 0 ? (s.changed ? 'Você mudou de opinião e ficou na maioria: 50%.' : 'Você manteve o voto e ficou na maioria: 100%!') : 'Desta vez você não ganhou.';
@@ -349,7 +379,32 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
           h += `<div class="card big">🗳️ ${s.voted} de ${s.players} já votaram</div>` + argsBlock(s);
           nextLabel = 'Fechar votação e mostrar resultado ▶';
         } else if (s.step === 'r1') {
-          h += bars(s.results, 'Voto 1') + argsBlock(s);
+          h += bars(s.results, 'Voto 1');
+          h += `<div class="card" style="background:#252627;border:1px dashed #666;margin:14px 0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-weight:700;color:var(--gold);font-size:1.05rem">🎤 Vez de Falar no Debate (Opcional)</span>
+              <span class="muted" style="font-size:0.85rem">Use se a sala estiver tímida</span>
+            </div>`;
+          if (s.speaker) {
+            const vBadge = s.speaker.vote === 'favor' ? '<span class="pill favor">Votou A FAVOR</span>' : s.speaker.vote === 'contra' ? '<span class="pill contra">Votou CONTRA</span>' : '<span class="pill gray">Sem voto</span>';
+            h += `<div class="speaker-box">
+              <div style="font-size:0.85rem;letter-spacing:0.1em;color:var(--gold);margin-bottom:4px">SORTEADO(A) PARA FALAR:</div>
+              <div style="font-size:2.2rem;font-weight:700;color:#fff;margin:6px 0">🎤 ${esc(s.speaker.nick)}</div>
+              <div style="margin-top:6px">${vBadge}</div>
+              <div style="margin-top:14px;display:flex;gap:10px;justify-content:center">
+                <button class="gray" style="padding:8px 16px;font-size:0.95rem" onclick="drawSpeaker('${esc(s.speaker.filter || 'all')}')">🎲 Sortear Outro</button>
+                <button class="gray" style="padding:8px 16px;font-size:0.95rem" onclick="clearSpeaker()">✖ Limpar</button>
+              </div>
+            </div>`;
+          } else {
+            h += `<div style="font-size:0.95rem;margin-bottom:10px" class="muted">Se alguém levantar a mão por vontade própria, basta deixar falar. Caso contrário, você pode sortear:</div>
+            <div class="row">
+              <button class="gray" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('all')">🎲 Sortear Qualquer Aluno</button>
+              <button class="favor" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('favor')">🟢 Quem votou A FAVOR</button>
+              <button class="contra" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('contra')">🔴 Quem votou CONTRA</button>
+            </div>`;
+          }
+          h += `</div>` + argsBlock(s);
           nextLabel = 'Abrir voto 2 ▶';
         } else {
           h += bars(s.resultsV1, 'Voto 1') + bars(s.resultsV2, 'Voto 2') + `<div class="card">🔄 ${s.changedCount} pessoa(s) mudaram de opinião.</div><h2>Top 5</h2><div class="card">${rankTable(s.ranking, 5)}</div>`;
@@ -361,7 +416,9 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
     }
     function setKey() { hostKey = document.getElementById('key').value; sessionStorage.setItem('hostKey', hostKey); poll(); }
     async function setPrice() { try { await api('/api/host', { action: 'price', value: document.getElementById('price').value }); } catch (e) { alert(e.message); } poll(); }
-async function act(action) { try { await api('/api/host', { action }); } catch (e) { alert(e.message); if (/chave/i.test(e.message)) { hostKey = null; sessionStorage.removeItem('hostKey'); } } poll(); }
+    async function drawSpeaker(filter) { try { await api('/api/host', { action: 'draw_speaker', filter }); } catch (e) { alert(e.message); } poll(); }
+    async function clearSpeaker() { try { await api('/api/host', { action: 'clear_speaker' }); } catch (e) { alert(e.message); } poll(); }
+    async function act(action) { try { await api('/api/host', { action }); } catch (e) { alert(e.message); if (/chave/i.test(e.message)) { hostKey = null; sessionStorage.removeItem('hostKey'); } } poll(); }
 
     let isPolling = false;
     async function poll() {
