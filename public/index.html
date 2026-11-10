@@ -363,7 +363,10 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
     async function setPrice() { try { await api('/api/host', { action: 'price', value: document.getElementById('price').value }); } catch (e) { alert(e.message); } poll(); }
 async function act(action) { try { await api('/api/host', { action }); } catch (e) { alert(e.message); if (/chave/i.test(e.message)) { hostKey = null; sessionStorage.removeItem('hostKey'); } } poll(); }
 
+    let isPolling = false;
     async function poll() {
+      if (isPolling) return;
+      isPolling = true;
       try {
         S = await api('/api/state?token=' + encodeURIComponent(token || ''));
         if (IS_HOST) {
@@ -371,8 +374,14 @@ async function act(action) { try { await api('/api/host', { action }); } catch (
           renderHost();
         } else renderPlayer();
       } catch (e) { /* mantém tela */ }
+      finally { isPolling = false; }
     }
-    poll(); setInterval(poll, 2500);
+
+    async function pollLoop() {
+      await poll();
+      setTimeout(pollLoop, 2800);
+    }
+    pollLoop();
   </script>
 </body>
 
