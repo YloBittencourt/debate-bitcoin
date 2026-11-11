@@ -274,10 +274,12 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
       return j;
     }
 
-    const bars = (c, title) => {
+    const bars = (c, title, q) => {
       const t = (c.favor + c.contra) || 1;
-      const row = (l, n, cls) => `<div class="bar"><div class="l">${l}</div><div class="t"><div class="f ${cls}" style="width:${Math.max(n / t * 100, n ? 8 : 0)}%">${n}</div></div><div>${Math.round(n / t * 100)}%</div></div>`;
-      return `<div class="bars"><div class="muted">${title}</div>${row('A favor', c.favor, 'favor')}${row('Contra', c.contra, 'contra')}</div>`;
+      const labelA = (q && q.optA) || 'A favor';
+      const labelB = (q && q.optB) || 'Contra';
+      const row = (l, n, cls) => `<div class="bar"><div class="l" style="width:140px;font-weight:600">${esc(l)}</div><div class="t"><div class="f ${cls}" style="width:${Math.max(n / t * 100, n ? 8 : 0)}%">${n}</div></div><div style="min-width:40px;text-align:right">${Math.round(n / t * 100)}%</div></div>`;
+      return `<div class="bars"><div class="muted" style="margin-bottom:6px">${title}</div>${row(labelA, c.favor, 'favor')}${row(labelB, c.contra, 'contra')}</div>`;
     };
     const rankTable = (r, n) => `<table>${r.slice(0, n || r.length).map((p, i) => `<tr><td>${i + 1}º</td><td>${esc(p.nick)}</td><td class="btc">${fmt(p.btc)}<div class="muted" style="font-weight:400">${brl(p.brl)}</div></td></tr>`).join('')}</table>`;
 
@@ -287,7 +289,11 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
       return `<h2>Pergunta ${s.q + 1} de ${s.total}</h2><div class="card big" style="font-size:1.2rem;line-height:1.4">${esc(s.question.title)}</div>`;
     }
     function argsBlock(s) {
-      return `<div class="arg favor"><span class="tag">A FAVOR</span>${esc(s.question.favor)}</div><div class="arg contra"><span class="tag">CONTRA</span>${esc(s.question.contra)}</div>`;
+      const labelA = (s.question && s.question.optA) || 'A FAVOR';
+      const labelB = (s.question && s.question.optB) || 'CONTRA';
+      const descA = (s.question && s.question.descA) || s.question.favor;
+      const descB = (s.question && s.question.descB) || s.question.contra;
+      return `<div class="arg favor"><span class="tag">🟢 ${esc(labelA.toUpperCase())}</span>${esc(descA)}</div><div class="arg contra"><span class="tag">🔴 ${esc(labelB.toUpperCase())}</span>${esc(descB)}</div>`;
     }
 
     // -------- Jogador --------
@@ -314,13 +320,15 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
         const step = s.step;
         if (step === 'v1' || step === 'v2') {
           const server = step === 'v1' ? s.myV1 : s.myV2;
-      const mine = lastVote && lastVote.key === s.phase && Date.now() - lastVote.t < 4000 ? lastVote.choice : server;
-          h += `<div class="muted">${stepName[step]}: escolha o seu lado</div>`;
-          h += `<div class="row" style="margin:10px 0"><button class="vote favor ${mine === 'favor' ? 'sel' : ''}" onclick="vote('favor')">A FAVOR</button><button class="vote contra ${mine === 'contra' ? 'sel' : ''}" onclick="vote('contra')">CONTRA</button></div>`;
+          const mine = lastVote && lastVote.key === s.phase && Date.now() - lastVote.t < 4000 ? lastVote.choice : server;
+          const optA = (s.question && s.question.optA) || 'A FAVOR';
+          const optB = (s.question && s.question.optB) || 'CONTRA';
+          h += `<div class="muted">${stepName[step]}: escolha o seu posicionamento</div>`;
+          h += `<div class="row" style="margin:10px 0"><button class="vote favor ${mine === 'favor' ? 'sel' : ''}" onclick="vote('favor')">🟢 ${esc(optA)}</button><button class="vote contra ${mine === 'contra' ? 'sel' : ''}" onclick="vote('contra')">🔴 ${esc(optB)}</button></div>`;
           h += mine ? `<div class="card">✅ Voto registrado. Você pode trocar até o fechamento.</div>` : `<div class="card muted">Ainda sem voto.</div>`;
           h += argsBlock(s);
         } else if (step === 'r1') {
-          h += bars(s.results, 'Resultado do voto 1');
+          h += bars(s.results, 'Resultado do voto 1', s.question);
           if (s.speaker) {
             const isMe = s.me && s.speaker.nick.toLowerCase() === s.me.nick.toLowerCase();
             if (isMe) {
@@ -329,15 +337,18 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
                 <div style="font-size:0.95rem;margin-top:4px">Compartilhe e defenda seus argumentos com a sala agora!</div>
               </div>`;
             } else {
-              const vTxt = s.speaker.vote === 'favor' ? ' (Votou A Favor)' : s.speaker.vote === 'contra' ? ' (Votou Contra)' : '';
+              const optA = (s.question && s.question.optA) || 'A FAVOR';
+              const optB = (s.question && s.question.optB) || 'CONTRA';
+              const vTxt = s.speaker.vote === 'favor' ? ` (Votou: ${optA})` : s.speaker.vote === 'contra' ? ` (Votou: ${optB})` : '';
               h += `<div class="card" style="background:#28261a;border-left:4px solid var(--gold);padding:12px 14px;font-size:1rem">
                 🎤 <b>${esc(s.speaker.nick)}</b> foi sorteado(a) para falar${esc(vTxt)}. Ouça a argumentação!
               </div>`;
             }
           }
-          h += `<div class="card">Seu voto: <b>${s.myV1 === 'favor' ? 'A FAVOR' : s.myV1 === 'contra' ? 'CONTRA' : 'não votou'}</b>. Hora do debate: fale e ouça!</div>` + argsBlock(s);
+          const meuVoto = s.myV1 === 'favor' ? ((s.question && s.question.optA) || 'A FAVOR') : s.myV1 === 'contra' ? ((s.question && s.question.optB) || 'CONTRA') : 'não votou';
+          h += `<div class="card">Seu voto: <b>${esc(meuVoto)}</b>. Hora do debate: fale e ouça!</div>` + argsBlock(s);
         } else {
-          h += bars(s.resultsV1, 'Voto 1') + bars(s.resultsV2, 'Voto 2');
+          h += bars(s.resultsV1, 'Voto 1', s.question) + bars(s.resultsV2, 'Voto 2', s.question);
           const msg = s.myReward > 0 ? (s.changed ? 'Você mudou de opinião e ficou na maioria: 50%.' : 'Você manteve o voto e ficou na maioria: 100%!') : 'Desta vez você não ganhou.';
           h += `<div class="card big">${s.myReward > 0 ? '🎉 +' + fmt(s.myReward) + ' (' + brl(s.myRewardBrl) + ')' : '😶 0 BTC'}<div class="muted" style="font-size:.95rem">${msg}</div></div><h2>Top 5</h2><div class="card">${rankTable(s.ranking)}</div>`;
         }
@@ -398,14 +409,16 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
           h += `<div class="card big">🗳️ ${s.voted} de ${s.players} já votaram</div>` + argsBlock(s);
           nextLabel = 'Fechar votação e mostrar resultado ▶';
         } else if (s.step === 'r1') {
-          h += bars(s.results, 'Voto 1');
+          const optA = (s.question && s.question.optA) || 'A FAVOR';
+          const optB = (s.question && s.question.optB) || 'CONTRA';
+          h += bars(s.results, 'Resultado do Voto 1', s.question);
           h += `<div class="card" style="background:#252627;border:1px dashed #666;margin:14px 0">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
               <span style="font-weight:700;color:var(--gold);font-size:1.05rem">🎤 Vez de Falar no Debate (Opcional)</span>
               <span class="muted" style="font-size:0.85rem">Use se a sala estiver tímida</span>
             </div>`;
           if (s.speaker) {
-            const vBadge = s.speaker.vote === 'favor' ? '<span class="pill favor">Votou A FAVOR</span>' : s.speaker.vote === 'contra' ? '<span class="pill contra">Votou CONTRA</span>' : '<span class="pill gray">Sem voto</span>';
+            const vBadge = s.speaker.vote === 'favor' ? `<span class="pill favor">Votou: ${esc(optA)}</span>` : s.speaker.vote === 'contra' ? `<span class="pill contra">Votou: ${esc(optB)}</span>` : '<span class="pill gray">Sem voto</span>';
             h += `<div class="speaker-box">
               <div style="font-size:0.85rem;letter-spacing:0.1em;color:var(--gold);margin-bottom:4px">SORTEADO(A) PARA FALAR:</div>
               <div style="font-size:2.2rem;font-weight:700;color:#fff;margin:6px 0">🎤 ${esc(s.speaker.nick)}</div>
@@ -419,14 +432,14 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
             h += `<div style="font-size:0.95rem;margin-bottom:10px" class="muted">Se alguém levantar a mão por vontade própria, basta deixar falar. Caso contrário, você pode sortear:</div>
             <div class="row">
               <button class="gray" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('all')">🎲 Sortear Qualquer Aluno</button>
-              <button class="favor" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('favor')">🟢 Quem votou A FAVOR</button>
-              <button class="contra" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('contra')">🔴 Quem votou CONTRA</button>
+              <button class="favor" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('favor')">🟢 Quem votou "${esc(optA)}"</button>
+              <button class="contra" style="padding:12px 8px;font-size:0.95rem" onclick="drawSpeaker('contra')">🔴 Quem votou "${esc(optB)}"</button>
             </div>`;
           }
           h += `</div>` + argsBlock(s);
           nextLabel = 'Abrir voto 2 ▶';
         } else {
-          h += bars(s.resultsV1, 'Voto 1') + bars(s.resultsV2, 'Voto 2') + `<div class="card">🔄 ${s.changedCount} pessoa(s) mudaram de opinião.</div><h2>Top 5</h2><div class="card">${rankTable(s.ranking, 5)}</div>`;
+          h += bars(s.resultsV1, 'Voto 1', s.question) + bars(s.resultsV2, 'Voto 2', s.question) + `<div class="card">🔄 ${s.changedCount} pessoa(s) mudaram de opinião.</div><h2>Top 5</h2><div class="card">${rankTable(s.ranking, 5)}</div>`;
           nextLabel = s.q === s.total - 1 ? 'Ver ranking final ▶' : 'Próxima pergunta ▶';
         }
       }
