@@ -251,6 +251,49 @@
       0% { transform: scale(0.97); opacity: 0; }
       100% { transform: scale(1); opacity: 1; }
     }
+    .timer-card {
+      background: #252627;
+      border: 1px solid #484a4d;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      transition: border-color 0.3s;
+    }
+    .timer-digits {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .timer-bar-track {
+      width: 100%;
+      height: 6px;
+      background: #191a1b;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .timer-bar-fill {
+      height: 100%;
+      background: var(--gold);
+      border-radius: 99px;
+      transition: width 0.4s linear, background-color 0.4s;
+    }
+    .timer-warning {
+      color: #f1c40f !important;
+    }
+    .timer-urgent {
+      color: var(--r2) !important;
+      animation: timerPulse 0.9s infinite ease-in-out;
+    }
+    @keyframes timerPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .timer-expired {
+      color: var(--r2) !important;
+      font-weight: 700;
+    }
   </style>
 </head>
 
@@ -266,6 +309,30 @@
     let hostKey = sessionStorage.getItem('hostKey');
     let S = null, err = '', lastVote = null;
 const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
+
+    const fmtTime = (sec) => {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    };
+
+    function calcTimerInfo() {
+      if (!S || !S.timer) return null;
+      const t = S.timer;
+      if (t.state === 'paused') {
+        const rem = Math.max(0, t.remaining || 0);
+        const pct = t.duration > 0 ? Math.min(100, Math.max(0, (rem / t.duration) * 100)) : 0;
+        return { rem, total: t.duration, state: 'paused', pct };
+      }
+      if (t.state === 'running' && t.endTime) {
+        const skew = (S.serverNow && S._fetchTime) ? (Date.now() - S._fetchTime) : 0;
+        const nowServer = (S.serverNow || Date.now()) + skew;
+        const rem = Math.max(0, Math.ceil((t.endTime - nowServer) / 1000));
+        const pct = t.duration > 0 ? Math.min(100, Math.max(0, (rem / t.duration) * 100)) : 0;
+        return { rem, total: t.duration, state: rem === 0 ? 'expired' : 'running', pct };
+      }
+      return null;
+    }
 
     async function api(path, body) {
       const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-host-key': hostKey || '' }, body: JSON.stringify(body) } : { headers: { 'x-host-key': hostKey || '' } });
@@ -316,6 +383,26 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
         h += `<h2>Ranking Final</h2><div class="card">${rankTable(s.ranking, 10)}</div>`;
         h += `<div class="card muted" style="font-size:0.85rem"><b>Critérios oficiais de desempate:</b> 1º Saldo BTC ➔ 2º Firmeza no debate (manteve o voto na maioria) ➔ 3º Agilidade do voto</div>`;
       } else {
+        const tInfo = calcTimerInfo();
+        if (tInfo) {
+          let cls = '';
+          let statusTxt = 'Tempo restante';
+          if (tInfo.state === 'paused') { statusTxt = 'Cronômetro pausado'; }
+          else if (tInfo.rem === 0) { cls = 'timer-expired'; statusTxt = 'Tempo esgotado!'; }
+          else if (tInfo.rem <= 15) { cls = 'timer-urgent'; }
+          else if (tInfo.rem <= 60) { cls = 'timer-warning'; }
+          const barColor = tInfo.rem <= 15 ? 'var(--r2)' : tInfo.rem <= 60 ? '#f1c40f' : 'var(--gold)';
+
+          h += `<div class="timer-card" id="player-timer-card" style="border-color:${tInfo.rem <= 15 && tInfo.state === 'running' ? 'var(--r2)' : '#484a4d'}">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:0.95rem;font-weight:600">⏱️ <span id="player-timer-status">${statusTxt}</span></span>
+              <span id="player-timer-digits" class="timer-digits ${cls}" style="font-size:1.35rem">${tInfo.rem === 0 ? '00:00' : fmtTime(tInfo.rem)}</span>
+            </div>
+            <div class="timer-bar-track">
+              <div id="player-timer-fill" class="timer-bar-fill" style="width:${tInfo.pct}%;background-color:${barColor}"></div>
+            </div>
+          </div>`;
+        }
         h += questionBlock(s);
         const step = s.step;
         if (step === 'v1' || step === 'v2') {
@@ -404,7 +491,63 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
         h += `<div class="card muted" style="font-size:0.85rem"><b>Critérios oficiais de desempate:</b> 1º Saldo BTC ➔ 2º Firmeza no debate (manteve o voto na maioria) ➔ 3º Agilidade do voto</div>`;
         nextLabel = 'Fim';
       } else {
-        h += `<span class="pill">${stepName[s.step]}</span>` + questionBlock(s);
+        h += `<span class="pill">${stepName[s.step]}</span>`;
+
+        const tInfo = calcTimerInfo();
+        let timerDigits = '00:00';
+        let timerPct = 0;
+        let badgeHtml = '<span class="pill gray">Parado</span>';
+        let ctrlBtns = '';
+        let barColor = 'var(--gold)';
+        let cls = '';
+
+        if (tInfo) {
+          timerDigits = fmtTime(tInfo.rem);
+          timerPct = tInfo.pct;
+          if (tInfo.state === 'paused') {
+            badgeHtml = '<span class="pill" style="background:#5a4a12;color:#f1c40f">⏸️ Pausado</span>';
+            ctrlBtns = `<button class="favor" style="padding:6px 14px;font-size:0.85rem" onclick="resumeTimer()">▶️ Retomar</button> <button class="gray" style="padding:6px 14px;font-size:0.85rem" onclick="resetTimer()">⏹️ Zerar</button>`;
+          } else if (tInfo.state === 'expired') {
+            cls = 'timer-expired';
+            timerDigits = '00:00 (Esgotado)';
+            barColor = 'var(--r2)';
+            badgeHtml = '<span class="pill contra">⏰ Esgotado</span>';
+            ctrlBtns = `<button class="gray" style="padding:6px 14px;font-size:0.85rem" onclick="resetTimer()">⏹️ Limpar</button>`;
+          } else {
+            badgeHtml = '<span class="pill favor">⏱️ Rodando</span>';
+            if (tInfo.rem <= 15) { cls = 'timer-urgent'; barColor = 'var(--r2)'; }
+            else if (tInfo.rem <= 60) { cls = 'timer-warning'; barColor = '#f1c40f'; }
+            ctrlBtns = `<button class="gray" style="padding:6px 12px;font-size:0.85rem" onclick="pauseTimer()">⏸️ Pausar</button> <button class="gray" style="padding:6px 12px;font-size:0.85rem" onclick="addTimer(30)">+30s</button> <button class="gray" style="padding:6px 12px;font-size:0.85rem" onclick="resetTimer()">⏹️ Zerar</button>`;
+          }
+        }
+
+        h += `<div class="card" style="background:#222324;border:1px solid ${tInfo && tInfo.rem <= 15 && tInfo.state === 'running' ? 'var(--r2)' : '#484a4d'};margin:12px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-weight:700;color:var(--gold);font-size:1.05rem">⏱️ Cronômetro:</span>
+              <span id="host-timer-digits" class="timer-digits ${cls}" style="font-size:1.6rem">${timerDigits}</span>
+              <span id="host-timer-badge">${badgeHtml}</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${ctrlBtns}
+            </div>
+          </div>
+          <div class="timer-bar-track">
+            <div id="host-timer-fill" class="timer-bar-fill" style="width:${timerPct}%;background-color:${barColor}"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <span class="muted" style="font-size:0.85rem">Iniciar:</span>
+              <button class="gray" style="padding:6px 12px;font-size:0.85rem" onclick="startTimer(60)">1 min</button>
+              <button class="gray" style="padding:6px 12px;font-size:0.85rem" onclick="startTimer(120)">2 min</button>
+              <button class="gray" style="padding:6px 12px;font-size:0.85rem" onclick="startTimer(180)">3 min</button>
+              <button class="btn" style="width:auto;padding:6px 14px;font-size:0.85rem;background:var(--orange)" onclick="startTimer(300)">⏱️ 5 min</button>
+            </div>
+            <span class="muted" style="font-size:0.8rem">Você controla o encerramento no botão principal abaixo</span>
+          </div>
+        </div>`;
+
+        h += questionBlock(s);
         if (s.step === 'v1' || s.step === 'v2') {
           h += `<div class="card big">🗳️ ${s.voted} de ${s.players} já votaram</div>` + argsBlock(s);
           nextLabel = 'Fechar votação e mostrar resultado ▶';
@@ -450,6 +593,11 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
     async function setPrice() { try { await api('/api/host', { action: 'price', value: document.getElementById('price').value }); } catch (e) { alert(e.message); } poll(); }
     async function drawSpeaker(filter) { try { await api('/api/host', { action: 'draw_speaker', filter }); } catch (e) { alert(e.message); } poll(); }
     async function clearSpeaker() { try { await api('/api/host', { action: 'clear_speaker' }); } catch (e) { alert(e.message); } poll(); }
+    async function startTimer(sec) { try { await api('/api/host', { action: 'timer_start', duration: sec }); } catch (e) { alert(e.message); } poll(); }
+    async function pauseTimer() { try { await api('/api/host', { action: 'timer_pause' }); } catch (e) { alert(e.message); } poll(); }
+    async function resumeTimer() { try { await api('/api/host', { action: 'timer_resume' }); } catch (e) { alert(e.message); } poll(); }
+    async function addTimer(sec) { try { await api('/api/host', { action: 'timer_add', seconds: sec }); } catch (e) { alert(e.message); } poll(); }
+    async function resetTimer() { try { await api('/api/host', { action: 'timer_reset' }); } catch (e) { alert(e.message); } poll(); }
     async function act(action) { try { await api('/api/host', { action }); } catch (e) { alert(e.message); if (/chave/i.test(e.message)) { hostKey = null; sessionStorage.removeItem('hostKey'); } } poll(); }
 
     let isPolling = false;
@@ -458,6 +606,7 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
       isPolling = true;
       try {
         S = await api('/api/state?token=' + encodeURIComponent(token || ''));
+        S._fetchTime = Date.now();
         if (IS_HOST) {
           if (hostKey && S.ranking === undefined) { hostKey = null; sessionStorage.removeItem('hostKey'); }
           renderHost();
@@ -465,6 +614,39 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
       } catch (e) { /* mantém tela */ }
       finally { isPolling = false; }
     }
+
+    function tickTimer() {
+      const info = calcTimerInfo();
+      if (!info) return;
+
+      const digits = info.rem === 0 ? '00:00' : fmtTime(info.rem);
+      const barColor = info.rem <= 15 ? 'var(--r2)' : info.rem <= 60 ? '#f1c40f' : 'var(--gold)';
+
+      // Player elements
+      const pDigits = document.getElementById('player-timer-digits');
+      const pBar = document.getElementById('player-timer-fill');
+      const pStatus = document.getElementById('player-timer-status');
+      if (pDigits && pBar) {
+        pDigits.textContent = info.rem === 0 ? '00:00 (Esgotado!)' : digits;
+        pDigits.className = 'timer-digits ' + (info.rem === 0 ? 'timer-expired' : info.rem <= 15 ? 'timer-urgent' : info.rem <= 60 ? 'timer-warning' : '');
+        pBar.style.width = info.pct + '%';
+        pBar.style.backgroundColor = barColor;
+        if (pStatus) {
+          pStatus.textContent = info.state === 'paused' ? 'Cronômetro pausado' : info.rem === 0 ? 'Tempo esgotado!' : 'Tempo restante';
+        }
+      }
+
+      // Host elements
+      const hDigits = document.getElementById('host-timer-digits');
+      const hBar = document.getElementById('host-timer-fill');
+      if (hDigits && hBar) {
+        hDigits.textContent = info.rem === 0 ? '00:00 (Esgotado)' : digits;
+        hDigits.className = 'timer-digits ' + (info.rem === 0 ? 'timer-expired' : info.rem <= 15 ? 'timer-urgent' : info.rem <= 60 ? 'timer-warning' : '');
+        hBar.style.width = info.pct + '%';
+        hBar.style.backgroundColor = barColor;
+      }
+    }
+    setInterval(tickTimer, 500);
 
     async function pollLoop() {
       await poll();
