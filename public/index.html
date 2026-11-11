@@ -300,7 +300,15 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
     h += `<h1>Você está dentro!</h1><div class="card">Aguarde o início do debate. ${s.players} pessoas na sala.<br><br><span class="muted">Cada pergunta vale ${fmt(s.prize)}. Quem fica na maioria do 2º voto ganha: manteve o voto = 100%, mudou de opinião = 50%. Quem fica na minoria ganha zero.<br><br>No final, convertemos seu saldo para reais pela cotação do bitcoin (${brl(s.price.brl)} por BTC).</span></div>`;
       } else if (s.kind === 'final') {
         const pos = s.ranking.findIndex((p) => p.nick === s.me.nick) + 1;
-        h += `<h1>Fim do debate!</h1><div class="card big">Você ficou em <b>${pos}º</b> com <span class="btc">${fmt(s.me.btc)}</span><div class="muted" style="font-size:1rem">Na vida real, isso seria <b>${brl(s.me.brl)}</b> (BTC a ${brl(s.price.brl)})</div></div><h2>Ranking</h2><div class="card">${rankTable(s.ranking, 10)}</div>`;
+        h += `<h1>Fim do debate!</h1><div class="card big">Você ficou em <b>${pos}º</b> com <span class="btc">${fmt(s.me.btc)}</span><div class="muted" style="font-size:1rem">Na vida real, isso seria <b>${brl(s.me.brl)}</b> (BTC a ${brl(s.price.brl)})</div></div>`;
+        if (pos === 1) {
+          h += `<div class="card" style="background:#18361b;border:2px solid #5fd068;text-align:center;padding:16px">
+            <div style="font-size:1.5rem;font-weight:700;color:#5fd068">🏆 1º LUGAR INCONTESTÁVEL!</div>
+            <div style="font-size:0.95rem;margin-top:4px;color:#eee">Você conquistou o topo do ranking final e levou a premiação do debate!</div>
+          </div>`;
+        }
+        h += `<h2>Ranking Final</h2><div class="card">${rankTable(s.ranking, 10)}</div>`;
+        h += `<div class="card muted" style="font-size:0.85rem"><b>Critérios oficiais de desempate:</b> 1º Saldo BTC ➔ 2º Firmeza no debate (manteve o voto na maioria) ➔ 3º Agilidade do voto</div>`;
       } else {
         h += questionBlock(s);
         const step = s.step;
@@ -371,7 +379,18 @@ const brl = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
         h += `<div class="card">${s.ranking.map((p) => esc(p.nick)).join(' · ') || '<span class="muted">Ninguém entrou ainda</span>'}</div>`;
         nextLabel = 'Começar ▶';
       } else if (s.kind === 'final') {
-        h += `<h1>Ranking final</h1><div class="card big">${rankTable(s.ranking, 10)}</div>`;
+        const champ = s.ranking && s.ranking[0];
+        h += `<h1>🏆 Vencedor do Debate</h1>`;
+        if (champ) {
+          h += `<div class="card big" style="background:linear-gradient(135deg,#2e260e,#4a3a10);border:2px solid var(--gold);text-align:center;padding:22px;margin-bottom:16px">
+            <div style="font-size:1rem;letter-spacing:0.12em;color:var(--gold);font-weight:700">1º LUGAR INCONTESTÁVEL</div>
+            <div style="font-size:2.8rem;font-weight:700;color:#fff;margin:8px 0">🥇 ${esc(champ.nick)}</div>
+            <div style="font-size:1.3rem"><span class="btc">${fmt(champ.btc)}</span> <span class="muted">(equiv. a ${brl(champ.brl)})</span></div>
+            <div class="muted" style="font-size:0.9rem;margin-top:8px">Firmeza de voto: ${champ.heldCount} rodadas | Votação ágil</div>
+          </div>`;
+        }
+        h += `<h2>Ranking Geral</h2><div class="card big">${rankTable(s.ranking, 15)}</div>`;
+        h += `<div class="card muted" style="font-size:0.85rem"><b>Critérios oficiais de desempate:</b> 1º Saldo BTC ➔ 2º Firmeza no debate (manteve o voto na maioria) ➔ 3º Agilidade do voto</div>`;
         nextLabel = 'Fim';
       } else {
         h += `<span class="pill">${stepName[s.step]}</span>` + questionBlock(s);
